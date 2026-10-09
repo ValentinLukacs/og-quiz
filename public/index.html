@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steckbrief-Quiz</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header><h1>🕵️ Team-Steckbrief-Quiz</h1><a class="btn ghost" href="/host">🎛 Quiz leiten</a></header>
+<main style="max-width:480px">
+  <div class="card">
+    <h2>Mitraten</h2>
+    <p class="muted">Gib den Session-Code vom Host und deinen Namen ein.</p>
+    <form id="joinForm" style="display:flex;flex-direction:column;gap:14px">
+      <label class="field">Session-Code
+        <input type="text" id="code" maxlength="5" autocomplete="off" autocapitalize="characters"
+          style="text-transform:uppercase;letter-spacing:.2em;font-size:24px;font-family:ui-monospace,monospace" required>
+      </label>
+      <label class="field">Dein Name
+        <input type="text" id="name" maxlength="40" autocomplete="nickname" required>
+      </label>
+      <button class="btn big" type="submit" id="joinBtn">Los geht's ▶</button>
+      <div class="err" id="err"></div>
+    </form>
+  </div>
+</main>
+<script src="/common.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const codeEl = document.getElementById("code"), nameEl = document.getElementById("name");
+codeEl.value = (params.get("code") || "").toUpperCase();
+nameEl.value = store.get("sbq_lastName") || "";
+(codeEl.value ? nameEl : codeEl).focus();
+
+// Schon in dieser Session? Direkt weiter.
+if(codeEl.value && store.get("sbq_player_"+codeEl.value)) location.replace("/play?code="+codeEl.value);
+
+document.getElementById("joinForm").onsubmit = async (e)=>{
+  e.preventDefault();
+  const btn = document.getElementById("joinBtn"), err = document.getElementById("err");
+  const code = codeEl.value.trim().toUpperCase();
+  err.textContent = ""; btn.disabled = true;
+  try{
+    const r = await api("join", {code, name:nameEl.value});
+    store.set("sbq_player_"+r.code, {pid:r.pid, name:r.name});
+    store.set("sbq_lastName", r.name);
+    location.href = "/play?code="+r.code;
+  }catch(ex){ err.textContent = ex.message; btn.disabled = false; }
+};
+</script>
+</body>
+</html>

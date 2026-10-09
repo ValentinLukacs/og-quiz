@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Steckbrief-Quiz · Mitraten</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <h1>🕵️ <span id="hdrName"></span></h1>
+  <div class="row"><span class="pill" id="hdrRound"></span><span class="pill" id="hdrScore"></span></div>
+</header>
+<main style="max-width:900px">
+  <div class="card" id="stage"><p class="muted">Verbinde …</p></div>
+  <div class="card" id="boardCard" style="display:none">
+    <h2>🏆 Rangliste</h2>
+    <div id="board"></div>
+  </div>
+  <p class="muted center" style="display:block">Session <b id="codeLbl"></b> · <a href="#" id="leave">Session verlassen</a></p>
+</main>
+<script src="/common.js"></script>
+<script>
+const code = (new URLSearchParams(location.search).get("code") || "").toUpperCase();
+const me = store.get("sbq_player_"+code);
+if(!me) location.replace("/?code="+code);
+document.getElementById("codeLbl").textContent = code;
+document.getElementById("hdrName").textContent = me?.name || "";
+document.getElementById("leave").onclick = (e)=>{ e.preventDefault(); if(confirm("Session wirklich verlassen? Deine Punkte bleiben, aber du kannst nicht mehr mitraten.")){ store.del("sbq_player_"+code); location.href="/"; } };
+
+let S = null, lastKey = "", sending = false, pendingGuess = null;
+const stage = document.getElementById("stage");
+
+const poller = startPolling(async ()=>{
+  try{
+    S = await api(`state?code=${encodeURIComponent(code)}&pid=${encodeURIComponent(me.pid)}`);
+  }catch(e){
+    if(e.status === 404){ store.del("sbq_player_"+code); stage.innerHTML = `<h2>Session beendet</h2><p class="muted">Diese Session gibt es nicht mehr.</p><a class="btn" href="/">Zur Startseite</a>`; poller.stop(); }
+    return;
+  }
+  if(S.unknownPlayer){ store.del("sbq_player_"+code); location.replace("/?code="+code); return; }
+  render();
+});
+
+function render(){
+  document.getElementById("hdrScore").textContent = `${S.me.score} Punkte · Platz ${S.me.rank}`;
+  document.getElementById("hdrRound").textContent = S.round ? `Runde ${S.round}${S.maxRounds?" / "+S.maxRounds:""}` : "Lobby";
+  document.getElementById("boardCard").style.display = (S.phase==="revealed" || S.phase==="lobby") ? "block" : "none";
+  document.getElementById("board").innerHTML = leaderboardHtml(S.leaderboard, S.phase==="lobby" ? 0 : 5);
+
+  if(pendingGuess && pendingGuess.round !== S.round) pendingGuess = null;
+  const key = [S.phase, S.round, S.question?.hintIdx, S.me.answer, pendingGuess?.i].join("|");
+  const counter = document.getElementById("answeredInfo");
+  if(key === lastKey){ if(counter) counter.textContent = answeredText(); return; }
+  lastKey = key;
+
+  if(S.phase === "lobby"){
+    stage.innerHTML = `<div class="center" style="display:block;padding:20px 0">
+      <div style="font-size:48px">⏳</div><h2>Du bist dabei, ${esc(S.me.name)}!</h2>
+      <p class="muted">Warte, bis der Host die erste Frage startet. ${S.playerCount} Mitspieler*innen bisher.</p></div>`;
+    return;
+  }
+  if(S.phase === "end"){
+    stage.innerHTML = `<div class="center" style="display:block"><div style="font-size:48px">🏁</div>
+      <h2>Endergebnis</h2><p>Du hast <b>${S.me.score} Punkte</b> und landest auf <b>Platz ${S.me.rank}</b> von ${S.playerCount}.</p></div>
+      <h3>Rangliste</h3>${leaderboardHtml(S.leaderboard)}`;
+    return;
+  }
+
+  const q = S.question, revealed = S.phase === "revealed";
+  const myGuess = S.me.answer ?? pendingGuess?.i ?? null;
+  let html = questionHtml(q, S.progressive);
+  if(!revealed && S.progressive)
+    html += `<p class="muted center" style="display:block">Hinweis ${q.hintIdx} von ${q.maxHints} · jetzt antworten = <b>${q.pointsNow} Punkt${q.pointsNow>1?"e":""}</b></p>`;
+  if(!revealed){
+    html += myGuess == null
+      ? `<p class="center" style="display:block;font-weight:600">Tippe auf die richtige Person:</p>`
+      : `<p class="center" style="display:block;font-weight:600">✅ Antwort abgegeben – warte auf die Auflösung …</p>`;
+    html += `<p class="muted center" style="display:block" id="answeredInfo">${answeredText()}</p>`;
+  }
+  const people = [...S.people].sort((a,b)=>a.name.localeCompare(b.name,"de"));
+  html += `<div class="names">${people.map(p=>{
+    let cls = "";
+    if(revealed){
+      if(p.i === S.reveal.correct) cls = "correct";
+      else if(p.i === myGuess) cls = "wrong";
+      else cls = "dim";
+    } else if(p.i === myGuess) cls = "picked";
+    else if(myGuess != null) cls = "dim";
+    const cnt = revealed && S.reveal.counts[p.i] ? `<span class="cnt">${S.reveal.counts[p.i]}</span>` : "";
+    return `<button class="name ${cls}" data-i="${p.i}" ${revealed||myGuess!=null?"disabled":""}>${cnt}${photoHtml(p.photo)} ${esc(p.name)}</button>`;
+  }).join("")}</div>`;
+
+  if(revealed){
+    const correct = S.people[S.reveal.correct];
+    const won = S.me.won;
+    html += `<div class="result">${won ? `🎉 Richtig! +${won} Punkt${won>1?"e":""}` : (S.me.answer==null ? "⏰ Nicht geantwortet" : "❌ Leider daneben")}<br>
+      <span style="font-weight:400;font-size:17px">Das war ${photoHtml(correct.photo)} <b>${esc(correct.name)}</b></span></div>
+      <p class="muted center" style="display:block">${S.reveal.winners.length ? "Richtig lagen: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>
+      <details><summary>📖 Ganzen Steckbrief von ${esc(correct.name)} ansehen</summary>${profileHtml(S.reveal.profile)}</details>`;
+  }
+  stage.innerHTML = html;
+  stage.querySelectorAll(".name:not(:disabled)").forEach(b=>b.onclick = ()=>guess(+b.dataset.i));
+}
+
+function answeredText(){ return `${S.answeredCount} von ${S.playerCount} haben geantwortet`; }
+
+async function guess(i){
+  if(sending) return;
+  sending = true; pendingGuess = {round:S.round, i}; render();
+  try{
+    await api("answer", {code, pid:me.pid, round:S.round, guess:i});
+  }catch(e){
+    pendingGuess = null; alert(e.message);
+  }finally{
+    sending = false; poller.now();
+  }
+}
+</script>
+</body>
+</html>
