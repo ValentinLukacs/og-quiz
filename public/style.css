@@ -68,3 +68,12 @@ details summary{cursor:pointer;color:var(--accent);font-weight:600;margin:8px 0}
 .grid2{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start}
 @media(max-width:860px){.grid2{grid-template-columns:1fr}}
 @media(max-width:640px){.sb{grid-template-columns:1fr}.sb dd{margin-bottom:8px}.names{grid-template-columns:repeat(2,1fr)}.card{padding:16px}}
+
+/* Countdown */
+.timer{position:relative;height:34px;background:#0b1220;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:12px 0}
+.timer-bar{position:absolute;inset:0 auto 0 0;background:linear-gradient(90deg,var(--ok),var(--accent));transition:width .1s linear}
+.timer.urgent .timer-bar{background:linear-gradient(90deg,var(--bad),var(--warn))}
+.timer.urgent{animation:pulse .5s ease-in-out infinite alternate}
+.timer-num{position:relative;display:block;text-align:center;line-height:32px;font-weight:800;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+@keyframes pulse{from{transform:scale(1)}to{transform:scale(1.02)}}
+.sound-btn{padding:7px 12px;font-size:13px}

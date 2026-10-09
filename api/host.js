@@ -1,6 +1,6 @@
 import { handler, readBody, send, HttpError } from "../lib/http.js";
 import { getSession, saveSession, getPlayers, setPlayer, resetPlayers, getAnswers, acquireRevealLock } from "../lib/store.js";
-import { pickQuestion, scoreRound } from "../lib/game.js";
+import { pickQuestion, scoreRound, deadlineFor } from "../lib/game.js";
 
 export default handler(["POST"], async (req, res) => {
   const body = await readBody(req);
@@ -23,6 +23,7 @@ export default handler(["POST"], async (req, res) => {
       if (s.phase !== "question" || !s.cfg.progressive) throw new HttpError(409, "Gerade kein Hinweis möglich.");
       if (s.current.hintIdx >= s.current.fields.length) throw new HttpError(409, "Keine weiteren Hinweise.");
       s.current.hintIdx++;
+      s.current.deadline = deadlineFor(s);
       break;
     }
     case "reveal": {
@@ -49,6 +50,7 @@ export default handler(["POST"], async (req, res) => {
     case "settings": {
       if (s.phase === "question") throw new HttpError(409, "Nicht während einer laufenden Frage.");
       if ("progressive" in body) s.cfg.progressive = !!body.progressive;
+      if ("timer" in body) s.cfg.timer = Math.max(0, Math.min(120, parseInt(body.timer, 10) || 0));
       if ("maxRounds" in body) s.cfg.maxRounds = Math.max(0, Math.min(500, parseInt(body.maxRounds, 10) || 0));
       break;
     }

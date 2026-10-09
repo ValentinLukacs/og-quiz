@@ -24,7 +24,8 @@ export default handler(["POST"], async (req, res) => {
   const photoCol = headers.includes(c.photoCol) ? c.photoCol : "";
   const fields = (Array.isArray(c.fields) ? c.fields : []).filter((f) => headers.includes(f) && f !== nameCol && f !== photoCol);
   const maxRounds = Math.max(0, Math.min(500, parseInt(c.maxRounds, 10) || 0));
-  const cfg = { nameCol, photoCol, fields, progressive: !!c.progressive, maxRounds };
+  const timer = c.timer === "" || c.timer == null ? 15 : Math.max(0, Math.min(120, parseInt(c.timer, 10) || 0));
+  const cfg = { nameCol, photoCol, fields, progressive: !!c.progressive, maxRounds, timer };
 
   const session = {
     code: "", hostKey: token(), gid: 1, createdAt: Date.now(),

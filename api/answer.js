@@ -1,5 +1,6 @@
 import { handler, readBody, send, HttpError } from "../lib/http.js";
 import { getSession, getPlayers, addAnswer } from "../lib/store.js";
+import { GRACE_MS } from "../lib/game.js";
 
 export default handler(["POST"], async (req, res) => {
   const body = await readBody(req);
@@ -7,6 +8,8 @@ export default handler(["POST"], async (req, res) => {
   const s = await getSession(code);
   if (!s) throw new HttpError(404, "Session nicht gefunden.");
   if (s.phase !== "question" || body.round !== s.round) throw new HttpError(409, "Diese Frage ist schon vorbei.");
+
+  if (s.current.deadline && Date.now() > s.current.deadline + GRACE_MS) throw new HttpError(409, "⏰ Zeit abgelaufen!");
 
   const players = await getPlayers(code);
   if (!players[body.pid]) throw new HttpError(403, "Unbekannter Spieler – bitte neu beitreten.");

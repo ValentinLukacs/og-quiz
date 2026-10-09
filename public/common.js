@@ -72,3 +72,44 @@ function parseDelimited(text){
   row.push(cell); rows.push(row);
   return rows.filter(r=>r.some(c=>c.trim()!==""));
 }
+
+/* ---------- Timer (Uhrzeit des Servers, damit alle Geräte gleich zählen) ---------- */
+let clockOffset = 0;
+function syncClock(S){ if(S && S.serverNow) clockOffset = S.serverNow - Date.now(); }
+function serverNow(){ return Date.now() + clockOffset; }
+/** Verbleibende Millisekunden der aktuellen Frage, null = ohne Timer. */
+function timeLeft(S){
+  const q = S && S.question;
+  if(!q || !q.deadline || S.phase !== "question") return null;
+  return Math.max(0, q.deadline - serverNow());
+}
+function timerHtml(){ return `<div class="timer" id="timer"><div class="timer-bar" id="timerBar"></div><span class="timer-num" id="timerNum"></span></div>`; }
+
+/** Aktualisiert Balken + Zahl und spielt in den letzten 5 Sekunden ein Ticken. Gibt die Restzeit zurück. */
+let lastTickSec = null;
+function updateTimer(S){
+  const left = timeLeft(S), el = document.getElementById("timer");
+  if(!el) return left;
+  if(left == null){ el.style.display = "none"; return null; }
+  el.style.display = "";
+  const total = (S.timer || 15) * 1000;
+  document.getElementById("timerBar").style.width = Math.min(100, left / total * 100) + "%";
+  const sec = Math.ceil(left / 1000);
+  document.getElementById("timerNum").textContent = left > 0 ? sec : "⏰ Zeit!";
+  el.classList.toggle("urgent", left <= 5000);
+  if(sec !== lastTickSec && sec > 0 && sec <= 5 && typeof Sound !== "undefined") Sound.sfx(sec <= 3 ? "tickUrgent" : "tick");
+  lastTickSec = sec;
+  return left;
+}
+
+function pointsHint(q, progressive){
+  return progressive
+    ? `Hinweis ${q.hintIdx} von ${q.maxHints} · schnellste richtige Antwort: <b>${q.pointsNow} Punkte</b>`
+    : `Schnellste richtige Antwort: <b>${q.pointsNow} Punkte</b> · danach 400 / 300 / 250 / 200`;
+}
+
+function winnersHtml(winners){
+  return winners.length
+    ? winners.map((w,i)=>`<span class="pill" style="color:var(--ok)">${["⚡","🥈","🥉"][i]||"✓"} ${esc(w.name)} +${w.pts}</span>`).join(" ")
+    : "Niemand lag richtig 🙈";
+}

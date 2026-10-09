@@ -11,7 +11,7 @@
 <body>
 <header>
   <h1>🎛 Steckbrief-Quiz · Host</h1>
-  <div class="row" id="hdrRight"></div>
+  <div class="row" id="hdrRight"><button class="btn ghost sound-btn" id="soundBtn"></button></div>
 </header>
 
 <main>
@@ -47,6 +47,7 @@
       <label class="field">Namens-Spalte <select id="nameCol"></select></label>
       <label class="field">Foto/Emoji-Spalte <select id="photoCol"></select></label>
       <label class="field">Anzahl Fragen (leer = alle) <input type="number" id="maxRounds" min="0" style="width:120px"></label>
+      <label class="field">Zeit pro Frage in Sek. (0 = ohne Timer) <input type="number" id="timer" min="0" max="120" style="width:120px"></label>
     </div>
     <div class="row" style="margin-top:14px">
       <label class="chip"><input type="checkbox" id="progressive"> 💡 Hinweis-Modus: bis zu 3 Hinweise pro Person – früh antworten bringt mehr Punkte (3/2/1)</label>
@@ -89,6 +90,7 @@
         <div class="row between">
           <div><span class="pill" id="roundPill"></span><span class="pill" id="poolPill"></span></div>
           <div class="row">
+            <label class="chip" title="Löst automatisch auf, sobald alle geantwortet haben oder die Zeit abgelaufen ist (im Hinweis-Modus kommt erst der nächste Hinweis)."><input type="checkbox" id="autoLive"> ⚡ Automatisch weiter</label>
             <label class="chip"><input type="checkbox" id="progLive"> 💡 Hinweis-Modus</label>
           </div>
         </div>
@@ -129,6 +131,7 @@
 </main>
 
 <script src="/common.js"></script>
+<script src="/sound.js"></script>
 <script>
 /* ======================= SETUP ======================= */
 const TEMPLATE_HEADERS = [
@@ -143,7 +146,7 @@ const TEMPLATE_HEADERS = [
 ];
 const $ = (id)=>document.getElementById(id);
 let DATA = store.get("sbq_host_data") || {headers:[], rows:[]};
-let CFG = Object.assign({nameCol:"", photoCol:"", fields:{}, progressive:false, maxRounds:""}, store.get("sbq_host_cfg") || {});
+let CFG = Object.assign({nameCol:"", photoCol:"", fields:{}, progressive:false, maxRounds:"", timer:15}, store.get("sbq_host_cfg") || {});
 
 function saveSetup(){ store.set("sbq_host_data", DATA); store.set("sbq_host_cfg", CFG); }
 
@@ -167,6 +170,7 @@ function renderSetup(){
   $("photoCol").innerHTML = `<option value="">— keine —</option>` + DATA.headers.map(h=>`<option ${h===CFG.photoCol?"selected":""}>${esc(h)}</option>`).join("");
   $("progressive").checked = !!CFG.progressive;
   $("maxRounds").value = CFG.maxRounds || "";
+  $("timer").value = CFG.timer ?? 15;
   $("fieldChips").innerHTML = DATA.headers.filter(h=>h!==CFG.nameCol && h!==CFG.photoCol)
     .map((h,i)=>`<label class="chip"><input type="checkbox" data-f="${esc(h)}" ${CFG.fields[h]?"checked":""}> ${esc(h)}</label>`).join("");
   $("fieldChips").querySelectorAll("input").forEach(cb=>cb.onchange=()=>{ CFG.fields[cb.dataset.f]=cb.checked; saveSetup(); });
@@ -178,6 +182,7 @@ $("nameCol").onchange = ()=>{ CFG.nameCol=$("nameCol").value; saveSetup(); rende
 $("photoCol").onchange = ()=>{ CFG.photoCol=$("photoCol").value; saveSetup(); renderSetup(); };
 $("progressive").onchange = ()=>{ CFG.progressive=$("progressive").checked; saveSetup(); };
 $("maxRounds").oninput = ()=>{ CFG.maxRounds=$("maxRounds").value; saveSetup(); };
+$("timer").oninput = ()=>{ CFG.timer=$("timer").value; saveSetup(); };
 $("allOn").onclick = ()=>{ DATA.headers.forEach(h=>CFG.fields[h]=true); saveSetup(); renderSetup(); };
 $("allOff").onclick = ()=>{ DATA.headers.forEach(h=>CFG.fields[h]=false); saveSetup(); renderSetup(); };
 $("pasteBtn").onclick = ()=>{ const t=$("paste").value; if(!t.trim()) return alert("Bitte zuerst Daten einfügen."); ingest(parseDelimited(t)); };
@@ -202,7 +207,7 @@ $("createBtn").onclick = async ()=>{
     const fields = DATA.headers.filter(h=>CFG.fields[h] && h!==CFG.nameCol && h!==CFG.photoCol);
     if(!fields.length) throw new Error("Bitte mindestens eine Frage-Spalte aktivieren.");
     const r = await api("create", {password:$("password").value, data:DATA,
-      cfg:{nameCol:CFG.nameCol, photoCol:CFG.photoCol, fields, progressive:CFG.progressive, maxRounds:CFG.maxRounds}});
+      cfg:{nameCol:CFG.nameCol, photoCol:CFG.photoCol, fields, progressive:CFG.progressive, maxRounds:CFG.maxRounds, timer:CFG.timer}});
     store.set("sbq_host_pw", $("password").value);
     store.set("sbq_host_session", r);
     startControl(r);
@@ -211,7 +216,11 @@ $("createBtn").onclick = async ()=>{
 };
 
 /* ======================= STEUERUNG ======================= */
-let SES = null, S = null, poller = null, lastKey = "", busy = false, spoiler = false;
+let SES = null, S = null, poller = null, lastKey = "", busy = false, spoiler = false, prev = {}, autoFired = "";
+Sound.bindToggle($("soundBtn"));
+let autoMode = store.get("sbq_host_auto") ?? true;
+$("autoLive").checked = autoMode;
+$("autoLive").onchange = ()=>{ autoMode = $("autoLive").checked; store.set("sbq_host_auto", autoMode); };
 
 function joinUrl(){ return `${location.origin}/?code=${SES.code}`; }
 
@@ -231,7 +240,7 @@ function startControl(ses){
 
 async function poll(){
   const pid = SES.player ? `&pid=${encodeURIComponent(SES.player.pid)}` : "";
-  try{ S = await api(`state?code=${SES.code}&hk=${SES.hostKey}${pid}`); }
+  try{ S = await api(`state?code=${SES.code}&hk=${SES.hostKey}${pid}`); syncClock(S); }
   catch(e){
     if(e.status===404){ alert("Die Session ist abgelaufen."); leave(); }
     return;
@@ -239,6 +248,7 @@ async function poll(){
   if(!S.host){ alert("Keine Host-Berechtigung für diese Session."); leave(); return; }
   if(SES.player && S.unknownPlayer){ setHostPlayer(null); }
   renderControl();
+  autoAdvance();
 }
 
 /* ---------- Host spielt mit ---------- */
@@ -301,11 +311,13 @@ function renderControl(){
   if(ph==="end"){ show("btnNext", false); }
 
   renderPlayCard();
-  const canGuess = !!(SES.player && S.me && ph === "question" && S.me.answer == null);
-  const key = [ph, S.round, q?.hintIdx, spoiler, canGuess].join("|");
+  const timeUp = timeLeft(S) === 0;
+  const canGuess = !!(SES.player && S.me && ph === "question" && S.me.answer == null && !timeUp);
+  const key = [ph, S.round, q?.hintIdx, spoiler, canGuess, timeUp].join("|");
   const live = $("liveInfo");
   if(key === lastKey){ if(live) live.innerHTML = liveInfoHtml(); return; }
   lastKey = key;
+  playTransitionSound();
 
   const stage = $("stage");
   if(ph === "lobby"){
@@ -322,7 +334,7 @@ function renderControl(){
   }
   const revealed = ph === "revealed";
   let html = questionHtml(q, S.progressive);
-  if(!revealed && S.progressive) html += `<p class="muted center" style="display:block">Hinweis ${q.hintIdx} von ${q.maxHints} · jetzt ${q.pointsNow} Punkt${q.pointsNow>1?"e":""}</p>`;
+  if(!revealed) html += timerHtml() + `<p class="muted center" style="display:block">${pointsHint(q, S.progressive)}</p>`;
   if(!revealed) html += `<div id="liveInfo">${liveInfoHtml()}</div>`;
   const people = [...S.people].sort((a,b)=>a.name.localeCompare(b.name,"de"));
   html += `<div class="names">${people.map(p=>{
@@ -336,10 +348,11 @@ function renderControl(){
   if(revealed){
     const c = S.people[S.reveal.correct];
     html += `<div class="result">Das war ${photoHtml(c.photo)} ${esc(c.name)}!</div>
-      <p class="center" style="display:block">${S.reveal.winners.length ? "✅ Richtig: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>`;
+      <p class="center" style="display:block">${winnersHtml(S.reveal.winners)}</p>`;
   }
   stage.innerHTML = html;
   if(canGuess) stage.querySelectorAll(".name").forEach(b=>b.onclick = ()=>hostGuess(+b.dataset.i));
+  updateTimer(S);
   const sl = $("spoilerLink");
   if(sl) sl.onclick = (e)=>{ e.preventDefault(); spoiler=!spoiler; renderControl(); };
 }
@@ -353,6 +366,36 @@ function liveInfoHtml(){
 }
 
 function show(id, v){ $(id).style.display = v ? "" : "none"; }
+
+function playTransitionSound(){
+  const cur = {phase:S.phase, round:S.round, hint:S.question?.hintIdx};
+  if(prev.phase !== undefined){
+    if(cur.phase === "question" && cur.round !== prev.round) Sound.sfx("start");
+    else if(cur.phase === "question" && cur.hint > prev.hint) Sound.sfx("hint");
+    else if(cur.phase === "revealed" && prev.phase !== "revealed") Sound.sfx(SES.player && S.me ? (S.me.won ? "correct" : "wrong") : "reveal");
+    else if(cur.phase === "end" && prev.phase !== "end") Sound.sfx("fanfare");
+  }
+  prev = cur;
+}
+
+/** Automatisch weiter: alle haben geantwortet → auflösen; Zeit um → nächster Hinweis bzw. auflösen. */
+function autoAdvance(){
+  if(!autoMode || !S || S.phase !== "question" || busy) return;
+  const q = S.question, left = timeLeft(S);
+  const stage = S.round + "|" + q.hintIdx;
+  if(autoFired === stage) return;
+  const allIn = S.playerCount > 0 && S.answeredCount >= S.playerCount;
+  const timeUp = left === 0 && serverNow() > q.deadline + 1600; // Kulanzzeit des Servers abwarten
+  if(allIn){ autoFired = stage; act("reveal"); }
+  else if(timeUp){ autoFired = stage; act(S.progressive && q.hintIdx < q.maxHints ? "hint" : "reveal"); }
+}
+
+setInterval(()=>{
+  if(!S || S.phase !== "question") return;
+  const left = updateTimer(S);
+  if(left === 0 && !lastKey.endsWith("|true")) renderControl();
+  autoAdvance();
+}, 100);
 
 async function act(action, extra={}){
   if(busy) return;
