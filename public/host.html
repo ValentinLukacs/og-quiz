@@ -108,6 +108,15 @@
         <h2>🏆 Rangliste <span class="muted" id="playerCount"></span></h2>
         <div id="board"></div>
       </div>
+      <div class="card" id="playCard">
+        <h2>🎮 Selbst mitspielen</h2>
+        <div id="playJoin">
+          <p class="muted">Tritt als Spieler*in bei und tippe direkt hier auf die Namen. Dein Tipp wird auf dem geteilten Bildschirm nicht angezeigt.</p>
+          <div class="row"><input type="text" id="hostName" maxlength="40" placeholder="Dein Name" style="flex:1;min-width:0"><button class="btn" id="btnPlay">Beitreten</button></div>
+          <div class="err" id="playErr"></div>
+        </div>
+        <div id="playInfo" style="display:none"></div>
+      </div>
       <div class="card">
         <div class="row">
           <button class="btn ghost" id="btnReset">↺ Neue Runde (Punkte auf 0)</button>
@@ -215,17 +224,62 @@ function startControl(ses){
   if(window.QRCode) new QRCode($("qr"), {text: joinUrl(), width:150, height:150});
   else $("qr").style.display = "none";
   lastKey = "";
+  $("hostName").value = store.get("sbq_lastName") || "";
+  renderPlayCard();
   poller = startPolling(poll, 1500);
 }
 
 async function poll(){
-  try{ S = await api(`state?code=${SES.code}&hk=${SES.hostKey}`); }
+  const pid = SES.player ? `&pid=${encodeURIComponent(SES.player.pid)}` : "";
+  try{ S = await api(`state?code=${SES.code}&hk=${SES.hostKey}${pid}`); }
   catch(e){
     if(e.status===404){ alert("Die Session ist abgelaufen."); leave(); }
     return;
   }
   if(!S.host){ alert("Keine Host-Berechtigung für diese Session."); leave(); return; }
+  if(SES.player && S.unknownPlayer){ setHostPlayer(null); }
   renderControl();
+}
+
+/* ---------- Host spielt mit ---------- */
+function setHostPlayer(p){
+  SES.player = p;
+  store.set("sbq_host_session", SES);
+  if(p){ store.set("sbq_player_"+SES.code, p); store.set("sbq_lastName", p.name); }
+  spoiler = false; lastKey = "";
+  renderPlayCard();
+}
+
+function renderPlayCard(){
+  const p = SES.player;
+  $("playJoin").style.display = p ? "none" : "";
+  $("playInfo").style.display = p ? "" : "none";
+  if(!p) return;
+  const me = S?.me;
+  let status = "";
+  if(me && S.phase === "question") status = me.answer != null ? "✅ Deine Antwort ist abgegeben." : "👉 Tippe links auf die richtige Person.";
+  if(me && S.phase === "revealed") status = me.won ? `🎉 Richtig! +${me.won} Punkt${me.won>1?"e":""}` : (me.answer == null ? "⏰ Nicht geantwortet" : "❌ Leider daneben");
+  $("playInfo").innerHTML = `<p>Du spielst mit als <b>${esc(p.name)}</b>${me ? ` · ${me.score} Punkte · Platz ${me.rank}` : ""}</p>
+    ${status ? `<p style="font-weight:600">${status}</p>` : ""}`;
+}
+
+$("btnPlay").onclick = async ()=>{
+  $("playErr").textContent = "";
+  try{
+    const r = await api("join", {code:SES.code, name:$("hostName").value});
+    setHostPlayer({pid:r.pid, name:r.name});
+    poller.now();
+  }catch(e){ $("playErr").textContent = e.message; }
+};
+$("hostName").addEventListener("keydown", e=>{ if(e.key==="Enter") $("btnPlay").click(); });
+
+let guessing = false;
+async function hostGuess(i){
+  if(guessing || !SES.player) return;
+  guessing = true;
+  try{ await api("answer", {code:SES.code, pid:SES.player.pid, round:S.round, guess:i}); }
+  catch(e){ $("ctrlErr").textContent = e.message; }
+  finally{ guessing = false; poller.now(); }
 }
 
 function renderControl(){
@@ -246,7 +300,9 @@ function renderControl(){
   $("btnEnd").classList.toggle("ghost", !(roundsDone || S.remaining===0));
   if(ph==="end"){ show("btnNext", false); }
 
-  const key = [ph, S.round, q?.hintIdx, spoiler].join("|");
+  renderPlayCard();
+  const canGuess = !!(SES.player && S.me && ph === "question" && S.me.answer == null);
+  const key = [ph, S.round, q?.hintIdx, spoiler, canGuess].join("|");
   const live = $("liveInfo");
   if(key === lastKey){ if(live) live.innerHTML = liveInfoHtml(); return; }
   lastKey = key;
@@ -274,15 +330,16 @@ function renderControl(){
     if(revealed) cls = p.i===S.reveal.correct ? "correct" : (S.reveal.counts[p.i] ? "wrong" : "dim");
     else if(spoiler && p.i===S.host.solution) cls = "picked";
     const cnt = revealed && S.reveal.counts[p.i] ? `<span class="cnt">${S.reveal.counts[p.i]}</span>` : "";
-    return `<button class="name ${cls}" disabled>${cnt}${photoHtml(p.photo)} ${esc(p.name)}</button>`;
+    return `<button class="name ${cls}" data-i="${p.i}" ${canGuess?"":"disabled"}>${cnt}${photoHtml(p.photo)} ${esc(p.name)}</button>`;
   }).join("")}</div>`;
-  if(!revealed) html += `<p class="center" style="display:block"><a href="#" id="spoilerLink" class="muted">${spoiler?"🙈 Lösung verbergen":"🔒 Lösung nur für mich anzeigen"}</a></p>`;
+  if(!revealed && !SES.player) html += `<p class="center" style="display:block"><a href="#" id="spoilerLink" class="muted">${spoiler?"🙈 Lösung verbergen":"🔒 Lösung nur für mich anzeigen"}</a></p>`;
   if(revealed){
     const c = S.people[S.reveal.correct];
     html += `<div class="result">Das war ${photoHtml(c.photo)} ${esc(c.name)}!</div>
       <p class="center" style="display:block">${S.reveal.winners.length ? "✅ Richtig: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>`;
   }
   stage.innerHTML = html;
+  if(canGuess) stage.querySelectorAll(".name").forEach(b=>b.onclick = ()=>hostGuess(+b.dataset.i));
   const sl = $("spoilerLink");
   if(sl) sl.onclick = (e)=>{ e.preventDefault(); spoiler=!spoiler; renderControl(); };
 }

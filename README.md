@@ -30,6 +30,7 @@ npm run dev      # http://localhost:3000 – nutzt einen In-Memory-Speicher
 - **Hinweis-Modus:** bis zu 3 Hinweise zur selben Person. Wer beim 1. Hinweis richtig tippt, bekommt 3 Punkte, beim 2. Hinweis 2 und beim 3. Hinweis 1.
 - Jede*r kann pro Frage nur einmal antworten. Die Lösung verlässt den Server erst bei „Auflösen“.
 - Personen, die seltener dran waren, werden bevorzugt gezogen.
+- Der Host kann über „Selbst mitspielen“ mitraten. Sein Tipp wird auf dem geteilten Bildschirm nicht angezeigt, und die Lösung bekommt er vorab nicht.
 - „Neue Runde“ setzt die Punkte auf 0, die Spieler*innen bleiben in der Session.
 
 ## Hinweise
