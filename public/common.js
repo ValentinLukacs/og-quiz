@@ -47,11 +47,10 @@ function questionHtml(q, progressive){
   if(!progressive){
     const h = q.hints[0];
     return `<div class="cat">Wer aus dem Team ist das?</div>
-      <div class="cat" style="color:var(--muted)">${esc(h.label)}</div>
-      <div class="answer">„${esc(h.value)}“</div>`;
+      <div class="answer"><div class="q-label">${esc(h.label)}</div>„${esc(h.value)}“</div>`;
   }
   return `<div class="cat">Wer aus dem Team ist das?</div>` +
-    q.hints.map((h,i)=>`<div class="hint"><span class="hl">Hinweis ${i+1} · ${esc(h.label)}</span>${esc(h.value)}</div>`).join("");
+    q.hints.map((h,i)=>`<div class="hint"><span class="hl">Hinweis ${i+1}</span><span class="q-label">${esc(h.label)}</span>${esc(h.value)}</div>`).join("");
 }
 
 /* CSV / Excel-Einfügen: Trennzeichen , ; oder Tab automatisch erkennen */
