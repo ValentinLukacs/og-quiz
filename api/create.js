@@ -1,10 +1,13 @@
 import { handler, readBody, send, sessionCode, token, HttpError } from "../lib/http.js";
-import { createSession } from "../lib/store.js";
+import { createSession, usingRedis } from "../lib/store.js";
 import { allPairs } from "../lib/game.js";
 
 const str = (v, max = 2000) => (v ?? "").toString().slice(0, max);
 
 export default handler(["POST"], async (req, res) => {
+  // Ohne Redis hat jede Serverless-Instanz ihren eigenen Speicher -> Sessions "verschwinden" sofort.
+  if (process.env.VERCEL && !usingRedis) throw new HttpError(500, "Keine Datenbank verbunden: Upstash Redis im Vercel-Projekt einrichten und neu deployen.");
+
   const body = await readBody(req);
 
   const pw = process.env.HOST_PASSWORD;
