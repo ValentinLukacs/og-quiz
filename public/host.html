@@ -280,8 +280,7 @@ function renderControl(){
   if(revealed){
     const c = S.people[S.reveal.correct];
     html += `<div class="result">Das war ${photoHtml(c.photo)} ${esc(c.name)}!</div>
-      <p class="center" style="display:block">${S.reveal.winners.length ? "✅ Richtig: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>
-      <details><summary>📖 Ganzen Steckbrief von ${esc(c.name)} zeigen</summary>${profileHtml(S.reveal.profile)}</details>`;
+      <p class="center" style="display:block">${S.reveal.winners.length ? "✅ Richtig: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>`;
   }
   stage.innerHTML = html;
   const sl = $("spoilerLink");

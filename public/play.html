@@ -97,8 +97,7 @@ function render(){
     const won = S.me.won;
     html += `<div class="result">${won ? `🎉 Richtig! +${won} Punkt${won>1?"e":""}` : (S.me.answer==null ? "⏰ Nicht geantwortet" : "❌ Leider daneben")}<br>
       <span style="font-weight:400;font-size:17px">Das war ${photoHtml(correct.photo)} <b>${esc(correct.name)}</b></span></div>
-      <p class="muted center" style="display:block">${S.reveal.winners.length ? "Richtig lagen: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>
-      <details><summary>📖 Ganzen Steckbrief von ${esc(correct.name)} ansehen</summary>${profileHtml(S.reveal.profile)}</details>`;
+      <p class="muted center" style="display:block">${S.reveal.winners.length ? "Richtig lagen: "+S.reveal.winners.map(esc).join(", ") : "Niemand lag richtig 🙈"}</p>`;
   }
   stage.innerHTML = html;
   stage.querySelectorAll(".name:not(:disabled)").forEach(b=>b.onclick = ()=>guess(+b.dataset.i));

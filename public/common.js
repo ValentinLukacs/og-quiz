@@ -43,10 +43,6 @@ function leaderboardHtml(lb, limit){
   return html;
 }
 
-function profileHtml(profile){
-  return `<dl class="sb">${profile.map(x=>`<dt>${esc(x.label)}</dt><dd>${esc(x.value)}</dd>`).join("")}</dl>`;
-}
-
 function questionHtml(q, progressive){
   if(!progressive){
     const h = q.hints[0];
