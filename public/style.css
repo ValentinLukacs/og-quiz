@@ -92,3 +92,9 @@ details summary{cursor:pointer;color:var(--accent);font-weight:500;margin:8px 0}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.015)}}
 .sound-btn{padding:6px 12px;font-size:13px;font-weight:500}
 .sound-btn.off{color:var(--muted)}
+
+/* Galaxus-Logo im Titel */
+h1{display:flex;align-items:center;gap:14px}
+h1 .logo{height:24px;width:auto;display:block}
+h1 .logo-sep{width:1px;height:22px;background:var(--line-strong)}
+@media(max-width:640px){h1{gap:10px}h1 .logo{height:18px}h1 .logo-sep{height:18px}}
