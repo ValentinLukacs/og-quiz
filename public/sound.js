@@ -161,13 +161,15 @@ const Sound = (() => {
   }
 
   const LABELS = {
-    music: ["🎵 Musik an", "🎵 Musik aus"],
-    sfx: ["🔔 Effekte an", "🔕 Effekte aus"],
+    music: ["🎵", "Musik an", "🔇", "Musik aus"],
+    sfx: ["🔔", "Effekte an", "🔕", "Effekte aus"],
   };
   function render() {
     document.querySelectorAll("[data-sound-toggle]").forEach((b) => {
       const k = b.dataset.soundToggle;
-      b.textContent = LABELS[k][on[k] ? 0 : 1];
+      const [icon, text] = on[k] ? LABELS[k].slice(0, 2) : LABELS[k].slice(2);
+      b.innerHTML = `${icon}<span class="lbl"> ${text}</span>`;
+      b.title = text;
       b.setAttribute("aria-pressed", on[k]);
       b.classList.toggle("off", !on[k]);
     });
