@@ -1,8 +1,9 @@
 /* Hintergrundmusik und Soundeffekte – komplett per Web Audio erzeugt (keine Audiodateien, keine Lizenzen). */
 const Sound = (() => {
-  const PREF = "sbq_sound";
+  const PREFS = { music: "sbq_music", sfx: "sbq_sfx" };
+  const on = { music: false, sfx: false };
   let ctx = null, master = null, music = null, noiseBuf = null;
-  let enabled = false, playing = false, loopTimer = null, step = 0, nextTime = 0;
+  let playing = false, loopTimer = null, step = 0, nextTime = 0;
 
   const TEMPO = 144, STEP = 60 / TEMPO / 2; // Achtelnoten
   // Fröhliche 8-Takt-Melodie (MIDI-Noten, 0 = Pause) über C – Am – F – G
@@ -55,7 +56,7 @@ const Sound = (() => {
   }
 
   function startMusic() {
-    if (!enabled || playing || !ensure()) return;
+    if (!on.music || playing || !ensure()) return;
     playing = true; step = 0; nextTime = ctx.currentTime + 0.05;
     music.gain.cancelScheduledValues(ctx.currentTime);
     music.gain.setValueAtTime(0.28, ctx.currentTime);
@@ -84,31 +85,53 @@ const Sound = (() => {
   };
 
   function sfx(name) {
-    if (!enabled || !ensure() || !SFX[name]) return;
+    if (!on.sfx || !ensure() || !SFX[name]) return;
     SFX[name](ctx.currentTime + 0.01);
   }
 
-  function setEnabled(on) {
-    enabled = on;
-    try { localStorage.setItem(PREF, on ? "1" : "0"); } catch (e) {}
-    if (on) startMusic(); else stopMusic();
-    document.querySelectorAll("[data-sound-toggle]").forEach(renderButton);
+  const LABELS = {
+    music: ["🎵 Musik an", "🎵 Musik aus"],
+    sfx: ["🔔 Effekte an", "🔕 Effekte aus"],
+  };
+  function render() {
+    document.querySelectorAll("[data-sound-toggle]").forEach((b) => {
+      const k = b.dataset.soundToggle;
+      b.textContent = LABELS[k][on[k] ? 0 : 1];
+      b.setAttribute("aria-pressed", on[k]);
+      b.classList.toggle("off", !on[k]);
+    });
   }
-  function renderButton(b) { b.textContent = enabled ? "🔊 Sound an" : "🔇 Sound aus"; b.setAttribute("aria-pressed", enabled); }
+  function set(kind, value) {
+    on[kind] = value;
+    try { localStorage.setItem(PREFS[kind], value ? "1" : "0"); } catch (e) {}
+    if (kind === "music") { if (value) startMusic(); else stopMusic(); }
+    else if (value) sfx("lock"); // kurze Hörprobe
+    render();
+  }
 
-  /** Verbindet einen Button als Ein/Aus-Schalter. Ein gespeichertes „an“ startet beim ersten Klick/Tipp auf die Seite. */
-  function bindToggle(btn) {
-    btn.dataset.soundToggle = "1";
-    btn.onclick = () => setEnabled(!enabled);
-    let saved = false;
-    try { saved = localStorage.getItem(PREF) === "1"; } catch (e) {}
-    if (saved) {
-      enabled = true;
-      const resume = () => { document.removeEventListener("pointerdown", resume, true); if (enabled) startMusic(); };
+  /** Verbindet die Schalter für Musik und Effekte. Gespeichertes „an“ startet beim ersten Klick/Tipp auf die Seite. */
+  function bindToggles(musicBtn, sfxBtn) {
+    musicBtn.dataset.soundToggle = "music";
+    sfxBtn.dataset.soundToggle = "sfx";
+    musicBtn.onclick = () => set("music", !on.music);
+    sfxBtn.onclick = () => set("sfx", !on.sfx);
+    let legacy = null;
+    try { legacy = localStorage.getItem("sbq_sound"); } catch (e) {}
+    for (const k of ["music", "sfx"]) {
+      let v = null;
+      try { v = localStorage.getItem(PREFS[k]); } catch (e) {}
+      on[k] = (v ?? legacy) === "1";
+    }
+    if (on.music || on.sfx) {
+      const resume = (e) => {
+        if (e.target.closest && e.target.closest("[data-sound-toggle]")) return; // Klick auf einen Schalter regelt sich selbst
+        document.removeEventListener("pointerdown", resume, true);
+        ensure(); if (on.music) startMusic();
+      };
       document.addEventListener("pointerdown", resume, true);
     }
-    renderButton(btn);
+    render();
   }
 
-  return { bindToggle, sfx, startMusic, stopMusic, get enabled() { return enabled; } };
+  return { bindToggles, sfx, startMusic, stopMusic, get musicPlaying() { return playing; } };
 })();

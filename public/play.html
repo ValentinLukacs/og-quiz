@@ -10,7 +10,7 @@
 <body>
 <header>
   <h1>🕵️ <span id="hdrName"></span></h1>
-  <div class="row"><span class="pill" id="hdrRound"></span><span class="pill" id="hdrScore"></span><button class="btn ghost sound-btn" id="soundBtn"></button></div>
+  <div class="row"><span class="pill" id="hdrRound"></span><span class="pill" id="hdrScore"></span><button class="btn ghost sound-btn" id="musicBtn"></button><button class="btn ghost sound-btn" id="sfxBtn"></button></div>
 </header>
 <main style="max-width:900px">
   <div class="card" id="stage"><p class="muted">Verbinde …</p></div>
@@ -31,7 +31,7 @@ document.getElementById("hdrName").textContent = me?.name || "";
 document.getElementById("leave").onclick = (e)=>{ e.preventDefault(); if(confirm("Session wirklich verlassen? Deine Punkte bleiben, aber du kannst nicht mehr mitraten.")){ store.del("sbq_player_"+code); location.href="/"; } };
 
 let S = null, lastKey = "", sending = false, pendingGuess = null, prev = {};
-Sound.bindToggle(document.getElementById("soundBtn"));
+Sound.bindToggles(document.getElementById("musicBtn"), document.getElementById("sfxBtn"));
 const stage = document.getElementById("stage");
 
 const poller = startPolling(async ()=>{

@@ -77,3 +77,4 @@ details summary{cursor:pointer;color:var(--accent);font-weight:600;margin:8px 0}
 .timer-num{position:relative;display:block;text-align:center;line-height:32px;font-weight:800;font-size:18px;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 @keyframes pulse{from{transform:scale(1)}to{transform:scale(1.02)}}
 .sound-btn{padding:7px 12px;font-size:13px}
+.sound-btn.off{opacity:.6}

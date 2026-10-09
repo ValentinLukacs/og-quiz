@@ -11,7 +11,7 @@
 <body>
 <header>
   <h1>🎛 Steckbrief-Quiz · Host</h1>
-  <div class="row" id="hdrRight"><button class="btn ghost sound-btn" id="soundBtn"></button></div>
+  <div class="row" id="hdrRight"><button class="btn ghost sound-btn" id="musicBtn"></button><button class="btn ghost sound-btn" id="sfxBtn"></button></div>
 </header>
 
 <main>
@@ -217,7 +217,7 @@ $("createBtn").onclick = async ()=>{
 
 /* ======================= STEUERUNG ======================= */
 let SES = null, S = null, poller = null, lastKey = "", busy = false, spoiler = false, prev = {}, autoFired = "";
-Sound.bindToggle($("soundBtn"));
+Sound.bindToggles($("musicBtn"), $("sfxBtn"));
 let autoMode = store.get("sbq_host_auto") ?? true;
 $("autoLive").checked = autoMode;
 $("autoLive").onchange = ()=>{ autoMode = $("autoLive").checked; store.set("sbq_host_auto", autoMode); };

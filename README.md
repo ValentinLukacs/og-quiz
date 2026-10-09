@@ -30,7 +30,7 @@ npm run dev      # http://localhost:3000 – nutzt einen In-Memory-Speicher
 - **Punkte nach Schnelligkeit:** Die schnellste richtige Antwort bekommt 500 Punkte, dann 400, 300 und 250. Alle weiteren Richtigen bekommen 200, falsche Antworten 0.
 - **Hinweis-Modus:** bis zu 3 Hinweise zur selben Person, der Timer startet bei jedem Hinweis neu. Wer erst beim 2. Hinweis antwortet, bekommt ⅔ der Punkte, beim 3. Hinweis ⅓.
 - **⚡ Automatisch weiter** (in der Host-Ansicht): löst auf, sobald alle geantwortet haben oder die Zeit abgelaufen ist (im Hinweis-Modus kommt dann erst der nächste Hinweis).
-- **Musik & Sounds:** Chiptune-Hintergrundmusik und Effekte, komplett im Browser erzeugt (keine Audiodateien). Jedes Gerät schaltet sie über 🔇/🔊 selbst ein.
+- **Musik & Sounds:** Chiptune-Hintergrundmusik und Effekte, komplett im Browser erzeugt (keine Audiodateien). Jedes Gerät schaltet Musik (🎵) und Effekte (🔔) getrennt ein und aus.
 - Jede*r kann pro Frage nur einmal antworten. Die Lösung verlässt den Server erst bei „Auflösen“.
 - Personen, die seltener dran waren, werden bevorzugt gezogen.
 - Der Host kann über „Selbst mitspielen“ mitraten. Sein Tipp wird auf dem geteilten Bildschirm nicht angezeigt, und die Lösung bekommt er vorab nicht.
